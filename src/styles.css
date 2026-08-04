@@ -1,8 +1,8 @@
-@import url("https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
 
 :root {
   font-family: "Space Grotesk Variable", "Segoe UI", sans-serif;
-  --font-pixel: "Pixelify Sans", "Courier New", monospace;
+  --font-pixel: "Press Start 2P", "Courier New", monospace;
   color: #171716;
   background: #f4f2ed;
   font-synthesis: none;
@@ -23,7 +23,8 @@
 
 .brand, .hero h1, .demo-topline h2, .how-section h2, .report-heading h2, .use-cases h2, .final-cta h2 {
   font-family: var(--font-pixel);
-  font-weight: 700;
+  font-weight: 400;
+  font-synthesis: none;
 }
 
 * { box-sizing: border-box; }
@@ -193,6 +194,14 @@ h1 em { color: var(--accent); font-style: normal; }
 .report-score strong { font-size: 70px; line-height: 0.9; letter-spacing: -0.08em; font-variant-numeric: tabular-nums; }
 .report-score small { margin-top: 8px; font-size: 13px; }
 .report-heading p { max-width: 700px; margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.5; }
+.brand, .hero h1, .demo-topline h2, .how-section h2, .report-heading h2, .use-cases h2, .final-cta h2 {
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-wrap: balance;
+  text-rendering: geometricPrecision;
+}
+.hero h1 { max-width: 860px; font-size: clamp(38px, 4.15vw, 64px); line-height: 1.34; }
+.demo-topline h2, .how-section h2, .report-heading h2, .use-cases h2, .final-cta h2 { font-size: clamp(28px, 3.25vw, 48px); }
 .analysis-status { width: fit-content; display: block; margin-top: 14px; padding: 8px 12px; color: var(--accent-dark); background: rgba(142, 255, 64, 0.14); border: 1px solid rgba(81, 170, 20, 0.28); border-radius: 999px; font-size: 13px; font-weight: 700; }
 .analysis-status--success { color: #276600; }
 .analysis-status--error { max-width: 700px; color: #a13220; background: rgba(255, 139, 119, 0.12); border-color: rgba(161, 50, 32, 0.25); }
@@ -285,7 +294,7 @@ footer > span { justify-self: end; }
   .header-action { min-height: 44px; padding: 0 14px; }
   .hero { min-height: calc(100dvh - 64px); padding: 36px 16px 44px; gap: 38px; }
   .hero-label { margin-bottom: 18px; }
-  h1 { font-size: clamp(52px, 17vw, 78px); line-height: 0.91; }
+  .hero h1 { font-size: clamp(30px, 9vw, 42px); line-height: 1.38; }
   .hero-copy > p { margin: 24px 0 28px; font-size: 18px; }
   .url-control { grid-template-columns: auto 1fr; padding: 7px 7px 7px 14px; }
   .url-control button { grid-column: 1 / -1; width: 100%; justify-content: center; margin-top: 6px; }
