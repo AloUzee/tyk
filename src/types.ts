@@ -14,3 +14,11 @@ export type Finding = {
   evidence: string;
   prompt: string;
 };
+
+export type AiReport = {
+  score: number;
+  verdict: string;
+  summary: string;
+  findings: Finding[];
+  analyzedUrl: string;
+};

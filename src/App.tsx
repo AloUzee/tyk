@@ -15,9 +15,23 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { demoSteps, findings } from "./demo-data";
-import type { RunPhase } from "./types";
+import type { AiReport, Finding, RunPhase } from "./types";
 
 const DEFAULT_URL = "tyk.pages.dev";
+
+async function analyzeSite(url: string): Promise<AiReport> {
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const data = (await response.json()) as Partial<AiReport> & { error?: string };
+  if (!response.ok) throw new Error(data.error || "Не удалось получить AI-отчёт");
+  if (!Array.isArray(data.findings) || typeof data.score !== "number") {
+    throw new Error("Модель вернула отчёт неизвестного формата");
+  }
+  return data as AiReport;
+}
 
 function normalizeUrl(value: string) {
   const trimmed = value.trim();
@@ -100,7 +114,7 @@ function UrlForm({ onStart, compact = false }: { onStart: (url: string) => void;
             <Warning weight="fill" aria-hidden="true" /> {error}
           </span>
         ) : (
-          <span>Сейчас работает демонстрационный сценарий без отправки данных.</span>
+          <span>AI изучит публичный HTML страницы. Пароли и формы не отправляются.</span>
         )}
       </div>
     </form>
@@ -250,9 +264,11 @@ function AgentFeed({ phase, step }: { phase: RunPhase; step: number }) {
 
 function DemoPanel({
   onReport,
+  onAnalyze,
   request,
 }: {
   onReport: () => void;
+  onAnalyze: (url: string) => void;
   request: { id: number; url: string } | null;
 }) {
   const [phase, setPhase] = useState<RunPhase>("idle");
@@ -264,7 +280,8 @@ function DemoPanel({
     setTestedUrl(url);
     setStep(0);
     setPhase("running");
-  }, []);
+    onAnalyze(url);
+  }, [onAnalyze]);
 
   useEffect(() => {
     if (request) start(request.url);
@@ -307,10 +324,21 @@ function DemoPanel({
   );
 }
 
-function ReportSection({ reportRef }: { reportRef: React.RefObject<HTMLElement | null> }) {
+function ReportSection({
+  reportRef,
+  report,
+  status,
+  error,
+}: {
+  reportRef: React.RefObject<HTMLElement | null>;
+  report: AiReport | null;
+  status: "idle" | "loading" | "success" | "error";
+  error: string;
+}) {
   const [copied, setCopied] = useState<number | null>(null);
+  const visibleFindings: Finding[] = report?.findings?.length ? report.findings : findings;
   const copyPrompt = async (index: number) => {
-    await navigator.clipboard.writeText(findings[index].prompt);
+    await navigator.clipboard.writeText(visibleFindings[index].prompt);
     setCopied(index);
     window.setTimeout(() => setCopied(null), 1800);
   };
@@ -318,14 +346,17 @@ function ReportSection({ reportRef }: { reportRef: React.RefObject<HTMLElement |
   return (
     <section className="report-section" id="result" ref={reportRef} aria-labelledby="report-title">
       <div className="report-heading">
-        <span className="report-score"><strong>68</strong><small>из 100</small></span>
+        <span className="report-score"><strong>{report?.score ?? 68}</strong><small>из 100</small></span>
         <div>
-          <h2 id="report-title">Красиво. Но первый пользователь застрял.</h2>
-          <p>Демонстрационный отчёт показывает формат результата до подключения реального агента.</p>
+          <h2 id="report-title">{report?.verdict || "Красиво. Но первый пользователь застрял."}</h2>
+          <p>{report?.summary || "Запустите проверку, чтобы Step 3.7 Flash заменил этот пример настоящим AI-отчётом."}</p>
+          {status === "loading" ? <span className="analysis-status">Step 3.7 Flash анализирует страницу…</span> : null}
+          {status === "success" ? <span className="analysis-status analysis-status--success">AI-отчёт готов</span> : null}
+          {status === "error" ? <span className="analysis-status analysis-status--error">{error}</span> : null}
         </div>
       </div>
       <div className="findings-grid">
-        {findings.map((finding, index) => (
+        {visibleFindings.map((finding, index) => (
           <article className={`finding finding--${index + 1}`} key={finding.title}>
             <div className="finding-topline">
               <span><Warning weight={index === 0 ? "fill" : "regular"} aria-hidden="true" /> {finding.severity}</span>
@@ -403,6 +434,9 @@ export function App() {
   const reportRef = useRef<HTMLElement>(null);
   const demoRef = useRef<HTMLDivElement>(null);
   const [demoRequest, setDemoRequest] = useState<{ id: number; url: string } | null>(null);
+  const [aiReport, setAiReport] = useState<AiReport | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [analysisError, setAnalysisError] = useState("");
 
   const scrollToDemo = () => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth", block: "start" });
   const scrollToReport = useCallback(() => {
@@ -412,6 +446,18 @@ export function App() {
     setDemoRequest({ id: Date.now(), url });
     scrollToDemo();
   };
+  const runAnalysis = useCallback(async (url: string) => {
+    setAiReport(null);
+    setAnalysisError("");
+    setAnalysisStatus("loading");
+    try {
+      setAiReport(await analyzeSite(url));
+      setAnalysisStatus("success");
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "Неизвестная ошибка анализа");
+      setAnalysisStatus("error");
+    }
+  }, []);
 
   return (
     <div id="top" ref={demoRef}>
@@ -433,9 +479,9 @@ export function App() {
             </div>
           </div>
         </section>
-        <DemoPanel onReport={scrollToReport} request={demoRequest} />
+        <DemoPanel onReport={scrollToReport} onAnalyze={runAnalysis} request={demoRequest} />
         <HowItWorks />
-        <ReportSection reportRef={reportRef} />
+        <ReportSection reportRef={reportRef} report={aiReport} status={analysisStatus} error={analysisError} />
         <UseCases />
         <section className="final-cta" aria-labelledby="final-title">
           <CursorClick weight="fill" aria-hidden="true" />

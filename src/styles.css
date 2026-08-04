@@ -185,6 +185,9 @@ h1 em { color: var(--accent); font-style: normal; }
 .report-score strong { font-size: 70px; line-height: 0.9; letter-spacing: -0.08em; font-variant-numeric: tabular-nums; }
 .report-score small { margin-top: 8px; font-size: 13px; }
 .report-heading p { max-width: 700px; margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.5; }
+.analysis-status { width: fit-content; display: block; margin-top: 14px; padding: 8px 12px; color: var(--accent-dark); background: rgba(142, 255, 64, 0.14); border: 1px solid rgba(81, 170, 20, 0.28); border-radius: 999px; font-size: 13px; font-weight: 700; }
+.analysis-status--success { color: #276600; }
+.analysis-status--error { max-width: 700px; color: #a13220; background: rgba(255, 139, 119, 0.12); border-color: rgba(161, 50, 32, 0.25); }
 .findings-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; grid-template-areas: "critical important" "critical note"; gap: 16px; }
 .finding { min-height: 290px; display: flex; flex-direction: column; padding: clamp(26px, 3vw, 42px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .finding--1 { grid-area: critical; min-height: 596px; color: #fff8f2; background: #2b2926; border-color: #2b2926; }
