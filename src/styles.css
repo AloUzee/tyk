@@ -249,7 +249,7 @@ h1 em { color: var(--accent); font-style: normal; }
 .finding-topline small { color: var(--muted); text-align: right; }
 .finding--1 .finding-topline small { color: #bcb5aa; }
 .finding h3 { max-width: 690px; margin: auto 0 16px; font-size: clamp(27px, 3vw, 47px); line-height: 1.02; letter-spacing: -0.05em; }
-.finding:not(.finding--1) h3 { font-size: clamp(23px, 2.2vw, 32px); }
+.finding:not(.finding--1) h3 { margin-top: clamp(30px, 3.2vw, 42px); font-size: clamp(23px, 2.2vw, 32px); }
 .finding p { max-width: 650px; margin: 0 0 28px; color: var(--muted); line-height: 1.55; }
 .finding--1 p { color: #c9c3b9; }
 .finding button { width: max-content; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0; color: var(--accent-dark); background: transparent; border: 0; font-weight: 720; text-align: left; }
