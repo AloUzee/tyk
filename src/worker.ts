@@ -84,9 +84,41 @@ function extractJson(value: string) {
 
 function messageText(response: NvidiaResponse) {
   const message = response.choices?.[0]?.message;
-  if (typeof message?.content === "string") return message.content;
-  if (Array.isArray(message?.content)) return message.content.map((part) => part.text ?? "").join("");
+  if (typeof message?.content === "string" && message.content.trim()) return message.content;
+  if (Array.isArray(message?.content)) {
+    const text = message.content.map((part) => part.text ?? "").join("");
+    if (text.trim()) return text;
+  }
   return message?.reasoning_content ?? "";
+}
+
+async function invokeNvidia(apiKey: string, prompt: string, retry: boolean) {
+  const response = await fetch(NVIDIA_URL, {
+    method: "POST",
+    signal: AbortSignal.timeout(retry ? 90_000 : 120_000),
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: "Отвечай только валидным JSON. Не показывай ход рассуждений." },
+        { role: "user", content: retry ? `${prompt}\n\nПовтор: выведи сразу готовый JSON без пояснений.` : prompt },
+      ],
+      temperature: retry ? 0 : 0.15,
+      top_p: 0.9,
+      max_tokens: 4096,
+      seed: retry ? 43 : 42,
+      stream: false,
+      reasoning_effort: "low",
+      chat_template_kwargs: { thinking: false },
+    }),
+  });
+  const data = (await response.json()) as NvidiaResponse;
+  if (!response.ok) throw new Error(data.error?.message ?? "NVIDIA API вернул ошибку");
+  return data;
 }
 
 async function analyze(request: Request, env: Env) {
@@ -138,46 +170,22 @@ async function analyze(request: Request, env: Env) {
 HTML:
 ${html}`;
 
-  let aiResponse: Response;
-  try {
-    aiResponse = await fetch(NVIDIA_URL, {
-      method: "POST",
-      signal: AbortSignal.timeout(120_000),
-      headers: {
-        authorization: `Bearer ${env.NVIDIA_API_KEY}`,
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
-        top_p: 0.95,
-        max_tokens: 1600,
-        seed: 42,
-        stream: false,
-        include_reasoning: false,
-        chat_template_kwargs: { thinking: false },
-      }),
-    });
-  } catch {
-    return json({ error: "NVIDIA API не ответил за 2 минуты. Попробуйте ещё раз" }, 504);
+  let lastError = "Модель вернула пустой ответ";
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const nvidia = await invokeNvidia(env.NVIDIA_API_KEY, prompt, attempt === 1);
+      const content = messageText(nvidia);
+      if (!content.trim()) {
+        lastError = `Модель вернула пустой ответ (${nvidia.choices?.[0]?.finish_reason ?? "unknown"})`;
+        continue;
+      }
+      const report = extractJson(content) as Record<string, unknown>;
+      return json({ ...report, analyzedUrl: target.toString(), model: MODEL });
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Ошибка NVIDIA API";
+    }
   }
-
-  const nvidia = (await aiResponse.json()) as NvidiaResponse;
-  if (!aiResponse.ok) {
-    return json({ error: nvidia.error?.message ?? "NVIDIA API вернул ошибку" }, 502);
-  }
-
-  const content = messageText(nvidia);
-  if (!content) return json({ error: "Модель вернула пустой ответ" }, 502);
-
-  try {
-    const report = extractJson(content) as Record<string, unknown>;
-    return json({ ...report, analyzedUrl: target.toString(), model: MODEL });
-  } catch {
-    return json({ error: "Не удалось разобрать ответ модели" }, 502);
-  }
+  return json({ error: `${lastError}. Автоматический повтор не помог` }, 502);
 }
 
 export default {
