@@ -336,7 +336,8 @@ function ReportSection({
   error: string;
 }) {
   const [copied, setCopied] = useState<number | null>(null);
-  const visibleFindings: Finding[] = status === "error" ? [] : report?.findings?.length ? report.findings : findings;
+  const visibleFindings: Finding[] = status === "error" ? [] : report ? report.findings : findings;
+  const hasRubric = Boolean(report?.categories?.length && report?.criteria?.length);
   const copyPrompt = async (index: number) => {
     await navigator.clipboard.writeText(visibleFindings[index].prompt);
     setCopied(index);
@@ -351,10 +352,56 @@ function ReportSection({
           <h2 id="report-title">{status === "error" ? "Анализ не завершён" : report?.verdict || "Красиво. Но первый пользователь застрял."}</h2>
           <p>{status === "error" ? "Вернитесь к форме и запустите проверку ещё раз — демонстрационные замечания не выдаются за AI-результат." : report?.summary || "Запустите проверку, чтобы Step 3.7 Flash заменил этот пример настоящим AI-отчётом."}</p>
           {status === "loading" ? <span className="analysis-status">Step 3.7 Flash анализирует страницу…</span> : null}
-          {status === "success" ? <span className="analysis-status analysis-status--success">AI-отчёт готов</span> : null}
+          {status === "success" ? (
+            <span className="analysis-status analysis-status--success">
+              {report?.aiStatus === "fallback" ? "TYK Score готов · AI временно недоступен" : "TYK Score и AI-пояснение готовы"}
+            </span>
+          ) : null}
           {status === "error" ? <span className="analysis-status analysis-status--error">{error}</span> : null}
         </div>
       </div>
+      {hasRubric ? (
+        <div className="rubric-panel">
+          <div className="rubric-head">
+            <div>
+              <span>Прозрачная методика</span>
+              <h3>{report?.rubricVersion}</h3>
+            </div>
+            <p>20 фиксированных проверок × 5 баллов. AI не может изменить оценку.</p>
+          </div>
+          <div className="category-grid" aria-label="Оценки по категориям">
+            {report?.categories?.map((category) => (
+              <article key={category.id}>
+                <div><strong>{category.title}</strong><span>{category.score} / {category.maxScore}</span></div>
+                <div className="category-track" aria-hidden="true"><span style={{ transform: `scaleX(${category.score / category.maxScore})` }} /></div>
+              </article>
+            ))}
+          </div>
+          <details className="criteria-details">
+            <summary>Показать все 20 критериев <ArrowRight aria-hidden="true" /></summary>
+            <div className="criteria-grid">
+              {report?.criteria?.map((item) => (
+                <article className={`criterion criterion--${item.status}`} key={item.id}>
+                  <span className="criterion-icon" aria-hidden="true">
+                    {item.status === "pass" ? <Check weight="bold" /> : item.status === "na" ? <span>—</span> : <X weight="bold" />}
+                  </span>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.evidence}</p>
+                  </div>
+                  <span className="criterion-points">{item.points} / {item.maxPoints}</span>
+                </article>
+              ))}
+            </div>
+          </details>
+        </div>
+      ) : null}
+      {hasRubric && visibleFindings.length ? (
+        <div className="findings-heading">
+          <span>{report?.aiStatus === "fallback" ? "По фиксированным критериям" : "Мнение AI"}</span>
+          <h3>{report?.aiStatus === "fallback" ? "Главные потери баллов" : "Что исправить в первую очередь"}</h3>
+        </div>
+      ) : null}
       <div className="findings-grid">
         {visibleFindings.map((finding, index) => (
           <article className={`finding finding--${index + 1}`} key={finding.title}>

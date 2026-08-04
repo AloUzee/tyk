@@ -1,3 +1,5 @@
+import { scoreHtml, type ScoreCriterion, type ScoreResult } from "./scoring";
+
 interface Env {
   NVIDIA_API_KEY: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -92,6 +94,42 @@ function messageText(response: NvidiaResponse) {
   return message?.reasoning_content ?? "";
 }
 
+function scoreVerdict(score: number) {
+  if (score >= 90) return "Основа сделана отлично";
+  if (score >= 75) return "Хороший сайт с точечными недочётами";
+  if (score >= 55) return "Работает, но заметно теряет пользователей";
+  if (score >= 35) return "Нужны важные исправления";
+  return "Базовый пользовательский путь под угрозой";
+}
+
+function fallbackFindings(criteria: ScoreCriterion[]) {
+  return criteria
+    .filter((item) => item.status === "fail")
+    .slice(0, 3)
+    .map((item, index) => ({
+      severity: index === 0 ? "Критично" : index === 1 ? "Важно" : "Наблюдение",
+      title: item.title,
+      description: item.recommendation,
+      evidence: item.evidence,
+      prompt: item.recommendation,
+    }));
+}
+
+function deterministicReport(score: ScoreResult, target: URL, error?: string) {
+  const failed = score.criteria.filter((item) => item.status === "fail");
+  return {
+    ...score,
+    verdict: scoreVerdict(score.score),
+    summary: error
+      ? `Объективная оценка рассчитана по ${score.criteria.length} критериям. AI-пояснение временно недоступно: ${error}`
+      : `Пройдено ${score.criteria.length - failed.length} из ${score.criteria.length} фиксированных проверок.`,
+    findings: fallbackFindings(score.criteria),
+    analyzedUrl: target.toString(),
+    model: MODEL,
+    aiStatus: "fallback" as const,
+  };
+}
+
 async function invokeNvidia(apiKey: string, prompt: string, retry: boolean) {
   const response = await fetch(NVIDIA_URL, {
     method: "POST",
@@ -122,8 +160,6 @@ async function invokeNvidia(apiKey: string, prompt: string, retry: boolean) {
 }
 
 async function analyze(request: Request, env: Env) {
-  if (!env.NVIDIA_API_KEY) return json({ error: "NVIDIA_API_KEY не настроен" }, 503);
-
   let body: { url?: unknown };
   try {
     body = await request.json();
@@ -159,16 +195,24 @@ async function analyze(request: Request, env: Env) {
   const contentType = pageResponse.headers.get("content-type") ?? "";
   if (!contentType.includes("text/html")) return json({ error: "По ссылке находится не HTML-страница" }, 422);
 
-  const html = cleanHtml(await pageResponse.text());
-  const prompt = `Ты — строгий UX-аудитор сервиса «ТЫК». Проанализируй HTML первого экрана публичного сайта ${target.toString()} как новый пользователь без контекста.
+  const rawHtml = await pageResponse.text();
+  const score = scoreHtml(rawHtml, target.toString());
+  const html = cleanHtml(rawHtml);
+  const failedCriteria = score.criteria.filter((item) => item.status === "fail");
+  const prompt = `Ты — редактор UX-отчёта сервиса «ТЫК». Код уже объективно проверил страницу ${target.toString()} по методике ${score.rubricVersion} и вычислил оценку ${score.score}/100.
 
-Не утверждай, что нажимал кнопки или видел визуальный дизайн: у тебя только HTML. Ищи несогласованные CTA, непонятное ценностное предложение, проблемы форм, доступности, навигации и доверия. Ответь ТОЛЬКО валидным JSON без markdown по схеме:
-{"score": 0-100, "verdict": "короткий заголовок", "summary": "1-2 предложения", "findings": [{"severity":"Критично|Важно|Наблюдение","title":"...","description":"...","evidence":"конкретный элемент или текст","prompt":"точное задание разработчику"}]}
+Ты НЕ выставляешь и НЕ изменяешь баллы. Объясни только перечисленные проваленные критерии, не добавляя новых фактов. Не утверждай, что нажимал кнопки или видел визуальный дизайн. Ответь ТОЛЬКО валидным JSON без markdown по схеме:
+{"verdict":"короткий вывод", "summary":"1-2 предложения", "findings":[{"severity":"Критично|Важно|Наблюдение","title":"...","description":"...","evidence":"...","prompt":"точное задание разработчику"}]}
 
-Верни 3 наиболее доказательных замечания. Не выдумывай отсутствующие элементы.
+Проваленные критерии:
+${JSON.stringify(failedCriteria.map(({ id, category, title, evidence, recommendation }) => ({ id, category, title, evidence, recommendation })))}
 
-HTML:
+Фрагмент HTML только для контекста:
 ${html}`;
+
+  if (!env.NVIDIA_API_KEY) {
+    return json(deterministicReport(score, target, "NVIDIA_API_KEY не настроен"));
+  }
 
   let lastError = "Модель вернула пустой ответ";
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -179,13 +223,24 @@ ${html}`;
         lastError = `Модель вернула пустой ответ (${nvidia.choices?.[0]?.finish_reason ?? "unknown"})`;
         continue;
       }
-      const report = extractJson(content) as Record<string, unknown>;
-      return json({ ...report, analyzedUrl: target.toString(), model: MODEL });
+      const ai = extractJson(content) as { verdict?: unknown; summary?: unknown; findings?: unknown };
+      if (typeof ai.verdict !== "string" || typeof ai.summary !== "string" || !Array.isArray(ai.findings)) {
+        throw new Error("AI вернул неполный JSON");
+      }
+      return json({
+        ...score,
+        verdict: ai.verdict,
+        summary: ai.summary,
+        findings: ai.findings,
+        analyzedUrl: target.toString(),
+        model: MODEL,
+        aiStatus: "ready",
+      });
     } catch (error) {
       lastError = error instanceof Error ? error.message : "Ошибка NVIDIA API";
     }
   }
-  return json({ error: `${lastError}. Автоматический повтор не помог` }, 502);
+  return json(deterministicReport(score, target, `${lastError}. Автоматический повтор не помог`));
 }
 
 export default {

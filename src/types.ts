@@ -21,4 +21,9 @@ export type AiReport = {
   summary: string;
   findings: Finding[];
   analyzedUrl: string;
+  rubricVersion?: string;
+  categories?: ScoreCategory[];
+  criteria?: ScoreCriterion[];
+  aiStatus?: "ready" | "fallback";
 };
+import type { ScoreCategory, ScoreCriterion } from "./scoring";
