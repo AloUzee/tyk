@@ -16,7 +16,7 @@ type NvidiaResponse = {
 
 const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const MODEL = "stepfun-ai/step-3.7-flash";
-const MAX_HTML_LENGTH = 120_000;
+const MAX_HTML_LENGTH = 24_000;
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -48,6 +48,8 @@ function cleanHtml(html: string) {
   return html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+    .replace(/\s(?:class|style|id|data-[\w:-]+)=(?:"[^"]*"|'[^']*')/gi, "")
     .replace(/<!--([\s\S]*?)-->/g, " ")
     .replace(/\s+/g, " ")
     .slice(0, MAX_HTML_LENGTH);
@@ -136,25 +138,31 @@ async function analyze(request: Request, env: Env) {
 HTML:
 ${html}`;
 
-  const aiResponse = await fetch(NVIDIA_URL, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.NVIDIA_API_KEY}`,
-      accept: "application/json",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-      top_p: 0.95,
-      max_tokens: 4096,
-      seed: 42,
-      stream: false,
-      include_reasoning: false,
-      chat_template_kwargs: { thinking: false },
-    }),
-  });
+  let aiResponse: Response;
+  try {
+    aiResponse = await fetch(NVIDIA_URL, {
+      method: "POST",
+      signal: AbortSignal.timeout(55_000),
+      headers: {
+        authorization: `Bearer ${env.NVIDIA_API_KEY}`,
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        top_p: 0.95,
+        max_tokens: 2200,
+        seed: 42,
+        stream: false,
+        include_reasoning: false,
+        chat_template_kwargs: { thinking: false },
+      }),
+    });
+  } catch {
+    return json({ error: "NVIDIA API не ответил за 55 секунд. Попробуйте ещё раз" }, 504);
+  }
 
   const nvidia = (await aiResponse.json()) as NvidiaResponse;
   if (!aiResponse.ok) {
