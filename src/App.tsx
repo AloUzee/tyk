@@ -336,7 +336,7 @@ function ReportSection({
   error: string;
 }) {
   const [copied, setCopied] = useState<number | null>(null);
-  const visibleFindings: Finding[] = report?.findings?.length ? report.findings : findings;
+  const visibleFindings: Finding[] = status === "error" ? [] : report?.findings?.length ? report.findings : findings;
   const copyPrompt = async (index: number) => {
     await navigator.clipboard.writeText(visibleFindings[index].prompt);
     setCopied(index);
@@ -346,10 +346,10 @@ function ReportSection({
   return (
     <section className="report-section" id="result" ref={reportRef} aria-labelledby="report-title">
       <div className="report-heading">
-        <span className="report-score"><strong>{report?.score ?? 68}</strong><small>из 100</small></span>
+        <span className="report-score"><strong>{status === "error" ? "—" : report?.score ?? 68}</strong><small>{status === "error" ? "ошибка" : "из 100"}</small></span>
         <div>
-          <h2 id="report-title">{report?.verdict || "Красиво. Но первый пользователь застрял."}</h2>
-          <p>{report?.summary || "Запустите проверку, чтобы Step 3.7 Flash заменил этот пример настоящим AI-отчётом."}</p>
+          <h2 id="report-title">{status === "error" ? "Анализ не завершён" : report?.verdict || "Красиво. Но первый пользователь застрял."}</h2>
+          <p>{status === "error" ? "Вернитесь к форме и запустите проверку ещё раз — демонстрационные замечания не выдаются за AI-результат." : report?.summary || "Запустите проверку, чтобы Step 3.7 Flash заменил этот пример настоящим AI-отчётом."}</p>
           {status === "loading" ? <span className="analysis-status">Step 3.7 Flash анализирует страницу…</span> : null}
           {status === "success" ? <span className="analysis-status analysis-status--success">AI-отчёт готов</span> : null}
           {status === "error" ? <span className="analysis-status analysis-status--error">{error}</span> : null}
@@ -371,6 +371,7 @@ function ReportSection({
           </article>
         ))}
       </div>
+      {status === "error" ? <div className="report-empty">Отчёт не создан. Попробуйте повторить запрос через несколько секунд.</div> : null}
     </section>
   );
 }

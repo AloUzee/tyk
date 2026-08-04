@@ -16,7 +16,7 @@ type NvidiaResponse = {
 
 const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const MODEL = "stepfun-ai/step-3.7-flash";
-const MAX_HTML_LENGTH = 24_000;
+const MAX_HTML_LENGTH = 12_000;
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -142,7 +142,7 @@ ${html}`;
   try {
     aiResponse = await fetch(NVIDIA_URL, {
       method: "POST",
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(120_000),
       headers: {
         authorization: `Bearer ${env.NVIDIA_API_KEY}`,
         accept: "application/json",
@@ -153,7 +153,7 @@ ${html}`;
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
         top_p: 0.95,
-        max_tokens: 2200,
+        max_tokens: 1600,
         seed: 42,
         stream: false,
         include_reasoning: false,
@@ -161,7 +161,7 @@ ${html}`;
       }),
     });
   } catch {
-    return json({ error: "NVIDIA API не ответил за 55 секунд. Попробуйте ещё раз" }, 504);
+    return json({ error: "NVIDIA API не ответил за 2 минуты. Попробуйте ещё раз" }, 504);
   }
 
   const nvidia = (await aiResponse.json()) as NvidiaResponse;
