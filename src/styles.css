@@ -1,5 +1,8 @@
+@import url("https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&display=swap");
+
 :root {
   font-family: "Space Grotesk Variable", "Segoe UI", sans-serif;
+  --font-pixel: "Pixelify Sans", "Courier New", monospace;
   color: #171716;
   background: #f4f2ed;
   font-synthesis: none;
@@ -16,6 +19,11 @@
   --danger: #b42318;
   --radius: 14px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.brand, .hero h1, .demo-topline h2, .how-section h2, .report-heading h2, .use-cases h2, .final-cta h2 {
+  font-family: var(--font-pixel);
+  font-weight: 700;
 }
 
 * { box-sizing: border-box; }

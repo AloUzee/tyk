@@ -4,7 +4,13 @@ interface Env {
 }
 
 type NvidiaResponse = {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{
+    finish_reason?: string;
+    message?: {
+      content?: string | Array<{ type?: string; text?: string }>;
+      reasoning_content?: string;
+    };
+  }>;
   error?: { message?: string };
 };
 
@@ -48,9 +54,37 @@ function cleanHtml(html: string) {
 }
 
 function extractJson(value: string) {
-  const fenced = value.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
-  const candidate = fenced ?? value.slice(value.indexOf("{"), value.lastIndexOf("}") + 1);
-  return JSON.parse(candidate);
+  const cleaned = value.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
+  const source = fenced ?? cleaned;
+  for (let start = source.indexOf("{"); start >= 0; start = source.indexOf("{", start + 1)) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < source.length; index += 1) {
+      const char = source[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') inString = true;
+      else if (char === "{") depth += 1;
+      else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) return JSON.parse(source.slice(start, index + 1));
+      }
+    }
+  }
+  throw new Error("JSON object not found");
+}
+
+function messageText(response: NvidiaResponse) {
+  const message = response.choices?.[0]?.message;
+  if (typeof message?.content === "string") return message.content;
+  if (Array.isArray(message?.content)) return message.content.map((part) => part.text ?? "").join("");
+  return message?.reasoning_content ?? "";
 }
 
 async function analyze(request: Request, env: Env) {
@@ -114,9 +148,11 @@ ${html}`;
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
       top_p: 0.95,
-      max_tokens: 1800,
+      max_tokens: 4096,
       seed: 42,
       stream: false,
+      include_reasoning: false,
+      chat_template_kwargs: { thinking: false },
     }),
   });
 
@@ -125,7 +161,7 @@ ${html}`;
     return json({ error: nvidia.error?.message ?? "NVIDIA API вернул ошибку" }, 502);
   }
 
-  const content = nvidia.choices?.[0]?.message?.content;
+  const content = messageText(nvidia);
   if (!content) return json({ error: "Модель вернула пустой ответ" }, 502);
 
   try {
