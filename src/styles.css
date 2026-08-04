@@ -180,9 +180,9 @@ h1 em { color: var(--accent); font-style: normal; }
 
 .how-section { max-width: 1440px; margin: 0 auto; padding: 120px clamp(20px, 4vw, 64px); }
 .how-section h2 { max-width: 1040px; }
-.how-flow { display: grid; grid-template-columns: 1.12fr 0.88fr 1fr; gap: 1px; margin-top: 70px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.how-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 1px; margin-top: 70px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .how-flow article { min-height: 300px; padding: clamp(28px, 4vw, 52px); background: var(--surface); }
-.how-flow article:nth-child(2) { transform: translateY(22px); background: var(--surface-strong); }
+.how-flow article:nth-child(2) { transform: none; background: var(--surface); }
 .how-flow article > span { width: 52px; height: 52px; display: grid; place-items: center; margin-bottom: 64px; color: var(--on-accent); background: var(--accent-dark); border-radius: 12px; }
 .how-flow svg { width: 27px; height: 27px; }
 .how-flow h3 { margin: 0 0 10px; font-size: 30px; letter-spacing: -0.04em; }
