@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "npm@11.6.2",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.app.json && vite build --config vite.config.ts --configLoader runner",
@@ -20,6 +21,7 @@
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^6.0.5",
     "typescript": "^5.9.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "wrangler": "^4.102.0"
   }
 }
